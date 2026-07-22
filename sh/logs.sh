@@ -7,13 +7,13 @@ CYAN=$(tput setaf 39)
 RESET=$(tput sgr0)
 
 function usage() {
-  printf "${GREEN} Usage:\n\t./logs.sh <file-to-tail>\n${RESET}"
+  printf "Usage:\n\t./logs.sh ${GREEN}<file-to-tail>\n${RESET}"
 }
 
 FILE_PATH="$1"
 
 if [[ ! -f "$FILE_PATH" ]]; then
-  printf "${CYAN} Invalid file: ${FILE_PATH} \n${RESET}"
+  printf "${RED}Invalid file: ${FILE_PATH} \n${RESET}"
   usage
   exit 1
 fi
