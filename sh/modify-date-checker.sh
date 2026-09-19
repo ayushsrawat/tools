@@ -47,7 +47,8 @@ for i in {1..31}; do
 done
 
 declare -A m
-max_len=0
+max_file_name_len=0
+max_modify_date_len=0
 for file in "$TARGET_DIR"/*; do
 	file_name=$(basename -- "$file")
 	modify=$(stat -x "$file" | grep Modify)
@@ -57,16 +58,31 @@ for file in "$TARGET_DIR"/*; do
 
 	m["$file_name"]=$(echo "$mod_day""$mod_day_ext" "$mod_month_year")
 
-	len=${#file_name}
-	if [[ "$len" -gt "$max_len" ]]; then
-		max_len="$len"
+	file_name_len=${#file_name}
+	modify_date_len=${#m["$file_name"]}
+	if [[ "$file_name_len" -gt "$max_file_name_len" ]]; then
+		max_file_name_len="$file_name_len"
+	fi
+	if [[ "$modify_date_len" -gt "$max_modify_date_len" ]]; then
+		max_modify_date_len="$modify_date_len"
 	fi
 done
 
-echo "Target File Count : ${#m[@]}"
+target_count=${#m[@]}
+echo "Target File Count : ${target_count}"
 
-for key in "${!m[@]}"; do
-	len=${#key}
-	spaces=$((max_len - len)) 
-    printf "| File: | $key %*s| Modify Date: ${m[$key]} \n" "$spaces" ""
-done
+if [[ $target_count -gt 0 ]]; then
+	file_name_spaces=$((max_file_name_len - 4))
+	modify_date_spaces=$((max_modify_date_len - 11))
+	total_width=$((${file_name_spaces} + ${modify_date_spaces} + 22)) 
+	printf "| File %*s| Modify Date %*s|\n" "${file_name_spaces}" "" "${modify_date_spaces}" ""
+	printf "%${total_width}s\n" | tr ' ' '_'
+	for key in "${!m[@]}"; do
+		file_name_len=${#key}
+		modify_date_len=${#m["$key"]}
+		file_name_spaces=$((${max_file_name_len} - ${file_name_len}))
+		modify_date_spaces=$((${max_modify_date_len} - ${modify_date_len}))
+		printf "| $key %*s| ${m[$key]} %*s|\n" "$file_name_spaces" "" "${modify_date_spaces}" ""
+	done
+	printf "%${total_width}s\n" | tr ' ' '_'
+fi
