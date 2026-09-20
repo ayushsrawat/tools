@@ -14,6 +14,7 @@ import (
 // tool's command line options
 type cmd struct {
 	dir     string
+	stats   bool
 	verbose bool
 	commit  bool
 }
@@ -72,7 +73,7 @@ func run(cmd *cobra.Command, args []string) {
 			fmt.Printf("error stating entry %v [%v] \n", entry.Name(), err)
 		}
 	}
-	if len(metadata) > 0 {
+	if opt.stats && len(metadata) > 0 {
 		totalWidth := padding.fileName + padding.creationDate + padding.modificationDate + 10
 		fmt.Printf("%s\n", strings.Repeat("_", totalWidth))
 		fmt.Printf("| %s%s | %s%s | %s%s |\n",
@@ -103,6 +104,9 @@ func exit(err error) {
 }
 
 func validateDirectory(dir string) error {
+	if len(dir) == 0 {
+		return fmt.Errorf("please provide target directory to organize")
+	}
 	info, err := os.Stat(dir)
 	if err == nil {
 		if info.IsDir() {
@@ -126,6 +130,7 @@ func main() {
 
 func init() {
 	rootCmd.Flags().StringVarP(&opt.dir, "file", "f", "", "directory to reorganize")
+	rootCmd.Flags().BoolVarP(&opt.stats, "stats", "s", false, "show stats of the target directory")
 	rootCmd.Flags().BoolVarP(&opt.commit, "commit", "c", false, "commit reorganizing files after dry run verification")
 	rootCmd.Flags().BoolVarP(&opt.verbose, "verbose", "v", false, "verbose logs")
 }
