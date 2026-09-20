@@ -19,6 +19,22 @@ type cmd struct {
 	commit  bool
 }
 
+type filespec struct {
+	name     string
+	timeSpec times.Timespec
+}
+
+type dirpair struct {
+	source string
+	target string
+}
+
+// file oraganizing stretegy
+type Stretegy interface {
+	plan(m map[string]times.Timespec) map[string][]filespec
+	execute(entries map[string][]filespec) error
+}
+
 type padding struct {
 	fileName         int
 	creationDate     int
@@ -96,11 +112,79 @@ func run(cmd *cobra.Command, args []string) {
 		}
 		fmt.Printf("%s\n", strings.Repeat("_", totalWidth))
 	}
+	p := opt.plan(metadata)
+	if opt.stats {
+		for folder, entries := range p {
+			fmt.Printf("%v\n", folder)
+			for _, e := range entries {
+				fmt.Printf("\t%v -> %v\n", e.name, e.timeSpec.ModTime().Format(dateFormat))
+			}
+		}
+	}
+	err = opt.execute(target, p)
+	if err != nil {
+		// todo: revert all the changes you made
+		exit(err)
+	}
 }
 
-func exit(err error) {
-	fmt.Printf("%v\n", err)
-	os.Exit(1)
+func (opt cmd) plan(m map[string]times.Timespec) map[string][]filespec {
+	// group files by modification year
+	plan := make(map[string][]filespec)
+	for file, meta := range m {
+		t := meta.ModTime()
+		folder := fmt.Sprintf("%d", t.Year())
+		plan[folder] = append(plan[folder], filespec{
+			name:     file,
+			timeSpec: meta,
+		})
+	}
+	return plan
+}
+
+// instead of map, we could have pair of source to target file; that gives more clarity
+func (opt cmd) execute(base string, entries map[string][]filespec) error {
+	updates := make([]dirpair, 0)
+	for folder, entries := range entries {
+		if opt.commit {
+			err := os.MkdirAll(filepath.Join(base, folder), 0755)
+			if err != nil {
+				return err
+			}
+		}
+
+		for _, e := range entries {
+			source := filepath.Join(base, e.name)
+			_, err := os.Stat(source)
+			if err != nil {
+				fmt.Printf("source [%v] doesn't exists", source)
+				return err
+			}
+			target := filepath.Join(base, folder, e.name)
+			if source != target {
+				updates = append(updates, dirpair{
+					source: source,
+					target: target,
+				})
+			}
+		}
+	}
+	if opt.verbose {
+		fmt.Printf("%v Updates \n", len(updates))
+		for _, e := range updates {
+			fmt.Printf("%s -> %s\n", e.source, e.target)
+		}
+	}
+	if opt.commit {
+		for _, e := range updates {
+			err := os.Rename(e.source, e.target)
+			if err != nil {
+				fmt.Printf("error moving source [%s]: [%v]\n", e.source, err)
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func validateDirectory(dir string) error {
@@ -133,4 +217,9 @@ func init() {
 	rootCmd.Flags().BoolVarP(&opt.stats, "stats", "s", false, "show stats of the target directory")
 	rootCmd.Flags().BoolVarP(&opt.commit, "commit", "c", false, "commit reorganizing files after dry run verification")
 	rootCmd.Flags().BoolVarP(&opt.verbose, "verbose", "v", false, "verbose logs")
+}
+
+func exit(err error) {
+	fmt.Printf("%v\n", err)
+	os.Exit(1)
 }
